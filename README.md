@@ -1,271 +1,205 @@
-# DataSense — Intelligent Data Pipeline with AI-Powered Anomaly Detection
+# DataSense 🔍
+### Intelligent Real-Time Data Pipeline with AI-Powered Anomaly Detection
 
-## What It Does
+> Built with Snowflake · dbt · Python · ChromaDB · Groq AI · Tavily · FastAPI · React
 
-DataSense ingests two years of UK retail transaction data, transforms it through a Bronze → Silver → Gold dbt pipeline into Snowflake, and then applies dual-method anomaly detection (statistical z-scoring + IsolationForest) to flag unusual revenue days. When an anomaly is detected, an AI agent retrieves relevant context from a curated knowledge base and the open web, then asks Claude to produce a plain-English root-cause report — all surfaced in a React dashboard.
+[![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen)](https://data-sense-eight.vercel.app)
+[![API Docs](https://img.shields.io/badge/API-Docs-blue)](https://datasense-api-n1s3.onrender.com/docs)
 
-## Architecture
+---
+
+## 🌐 Live Demo
+🔗 **App:** https://data-sense-eight.vercel.app
+📡 **API:** https://datasense-api-n1s3.onrender.com/docs
+
+> Note: Backend runs on Render free tier — first load may take 30-60 seconds to wake up.
+
+---
+
+## 🚨 The Problem
+Every retail and e-commerce business generates millions of transactions. Hidden inside that data are anomalies — sudden revenue spikes, unexpected drops, fraud patterns, supply chain signals — that cost businesses billions annually.
+
+By the time a human analyst notices something is wrong, it's already too late. Existing tools tell you WHAT happened, not WHY, and not in time to act.
+
+DataSense solves this by combining a production-grade data pipeline with AI-powered investigation — automatically detecting anomalies and explaining them in plain English before anyone has to ask.
+
+---
+
+## ✅ What It Does
+- Ingests 1,067,371 raw retail transactions through a Bronze → Silver → Gold pipeline built with dbt and Snowflake
+- Cleans messy real-world data: nulls, cancellations, outliers, invalid entries — all handled and flagged with audit trail
+- Detects revenue anomalies using two methods: Statistical (z-score > 2.5) and ML (IsolationForest) — confirmed when both agree
+- RAG system searches a domain knowledge base using ChromaDB semantic search to provide context for every anomaly
+- Tavily API pulls real-world news and events from the anomaly date for additional context
+- Groq AI (Llama 3.3 70B) writes a plain-English report: root cause, severity, confidence, and recommended action — in seconds
+
+---
+
+## 🏗️ Architecture
 
 ```
-Raw CSV (Kaggle)
-      │
-      ▼
-┌─────────────┐     ┌─────────────────────┐
-│  Bronze     │────▶│  Silver             │
-│  raw copy   │     │  cleaned + flagged  │
-└─────────────┘     └──────────┬──────────┘
-                               │
-                    ┌──────────▼──────────┐
-                    │  Gold models        │
-                    │  daily_revenue      │
-                    │  product_velocity   │
-                    │  customer_metrics   │
-                    │  anomaly_features   │
-                    └──────────┬──────────┘
-                               │
-              ┌────────────────▼────────────────────┐
-              │  Anomaly Detection (Python)          │
-              │  Statistical z-score > 2.5           │
-              │  + IsolationForest (ML)              │
-              │  → confirmed / possible / normal     │
-              └────────────┬────────────────────────┘
-                           │
-              ┌────────────▼────────────────────────┐
-              │  AI Agent                           │
-              │  ChromaDB RAG retrieval             │
-              │  + Tavily web search                │
-              │  + Claude (claude-opus-4-8)         │
-              └────────────┬────────────────────────┘
-                           │
-              ┌────────────▼────────────────────────┐
-              │  FastAPI backend                    │
-              └────────────┬────────────────────────┘
-                           │
-              ┌────────────▼────────────────────────┐
-              │  React + Plotly dashboard           │
-              └─────────────────────────────────────┘
+Raw CSV (1M+ rows)
+        ↓
+pipeline/ingest.py → Snowflake Bronze (raw, untouched)
+        ↓
+dbt Silver (cleaning: nulls, cancellations, outliers, flags)
+        ↓
+dbt Gold (metrics: daily revenue, product velocity, customer segments)
+        ↓
+IsolationForest + Z-Score Anomaly Detection
+        ↓
+ChromaDB RAG + Tavily Web Search
+        ↓
+Groq AI Agent (plain-English report)
+        ↓
+FastAPI → React Dashboard
 ```
 
-## Tech Stack
+---
 
-| Layer              | Technology                  | Purpose                                              |
-| ------------------ | --------------------------- | ---------------------------------------------------- |
-| Ingestion          | Python + pandas             | Load CSV into Snowflake in batches                   |
-| Transformation     | dbt                         | Bronze → Silver → Gold SQL models                    |
-| Warehouse          | Snowflake                   | Scalable storage and compute for all pipeline data   |
-| Anomaly Detection  | scikit-learn (IsolationForest) + z-score | Dual-method statistical + ML flagging |
-| Vector DB          | ChromaDB                    | Embed and retrieve knowledge-base chunks at query time |
-| AI Agent           | Anthropic (claude-opus-4-8) | Root-cause analysis from features + RAG + web context |
-| Web Search         | Tavily                      | Real-time web context for anomaly investigation      |
-| Backend            | FastAPI + uvicorn           | REST API serving anomaly data and AI analysis        |
-| Frontend           | React + Vite + Plotly.js    | Interactive dark-theme dashboard                     |
+## 🛠️ Tech Stack
 
-## The Data Pipeline
+| Layer | Technology | Purpose |
+|-------|-----------|---------|
+| Data Ingestion | Python + Pandas | Batch load 1M+ rows to Snowflake |
+| Data Warehouse | Snowflake | Cloud-native columnar storage |
+| Transformation | dbt | Bronze→Silver→Gold with 25 data tests |
+| Anomaly Detection | XGBoost + SciPy | Statistical + ML anomaly scoring |
+| Vector Database | ChromaDB | Semantic search over knowledge base |
+| AI Agent | Groq (Llama 3.3 70B) | Plain-English anomaly reports |
+| Web Search | Tavily API | Real-world event context |
+| Backend | FastAPI | REST API with 7 endpoints |
+| Frontend | React + Plotly | Live dashboard with AI side panel |
+| Deployment | Render + Vercel | Free cloud hosting |
 
-**Bronze** is a verbatim copy of the source CSV loaded into `DATASENSE_DB.RAW.ONLINE_RETAIL_II` with no transformations. It preserves all rows including cancellations (InvoiceNo starting with C), negative quantities, and null values. The bronze layer is the audit record.
+---
 
-**Silver** (`silver_retail_cleaned`) applies a sequence of cleaning steps: null critical fields are dropped, UnitPrice nulls are imputed using per-product median via a window function, cancelled orders and negative quantities are removed, known non-product stock codes (POST, DOT, BANK CHARGES, etc.) are filtered out, and CustomerID nulls are filled with the string `GUEST`. Outlier rows are flagged with a `data_quality_flag` column (`price_outlier`, `bulk_order`, `high_value_transaction`) but retained in the dataset for analyst review.
+## 📊 Data Pipeline
 
-**Gold** contains four models built on top of Silver:
-- `gold_daily_revenue` — daily revenue and order counts by country
-- `gold_product_velocity` — per-product daily units sold, 7-day rolling average, and lifetime revenue rank
-- `gold_customer_metrics` — per-customer total spend, order frequency, and RFM-based segment (VIP / REGULAR / OCCASIONAL)
-- `gold_anomaly_features` — one row per calendar day with revenue z-score, day-over-day change, 7-day rolling average, and the top-selling product for that day
+### Bronze Layer
+Raw data ingested exactly as-is. Zero transformations. Full audit trail.
+1,067,371 rows loaded from the UCI Online Retail II dataset.
 
-## Anomaly Detection
+### Silver Layer — Cleaning
+- CustomerID nulls → filled with 'GUEST', flagged as is_guest_purchase
+- Description nulls → filled with 'UNKNOWN'
+- Cancelled orders removed (InvoiceNo starting with 'C')
+- Non-product stock codes filtered (POST, DOT, BANK CHARGES, etc.)
+- Rows with Quantity ≤ 0 or UnitPrice ≤ 0 removed
+- Outliers flagged (not dropped): price_outlier, bulk_order, high_value_transaction
+- Derived columns: TotalRevenue, IsWeekend, DayOfWeek, InvoiceMonth
 
-`pipeline/detect.py` reads `gold_anomaly_features` and applies two independent methods:
+### Gold Layer — Business Metrics
+- Daily revenue by country with 7-day rolling average
+- Day-over-day revenue change % and z-score
+- Product velocity rankings and fast-mover flags
+- Customer segmentation: VIP (>£1000), REGULAR (£250-1000), OCCASIONAL (<£250)
+- Anomaly features table combining all signals
 
-1. **Statistical z-score** — flags any day where `|revenue_zscore| > 2.5`. This identifies days that are unusually far from the dataset mean.
+---
 
-2. **IsolationForest** — trains on four features (`revenue_zscore`, `revenue_dod_change_pct`, `total_orders`, `unique_customers`) with `contamination=0.05` and flags multivariate outliers that the univariate z-score might miss.
+## 🤖 How the AI Agent Works
 
-The two signals are combined:
-- **confirmed_anomaly** — both methods agree the day is anomalous
-- **possible_anomaly** — exactly one method flags the day
-- **normal** — neither method flags the day
+**Step 1 — RAG Retrieval**
+When an anomaly fires, ChromaDB searches a knowledge base of retail domain documents using semantic similarity to find the most relevant context.
 
-Results are written to `DATASENSE_DB.PUBLIC.ANOMALY_RESULTS`.
+**Step 2 — Real-World Context**
+Tavily searches the web for news and events on the anomaly date: holidays, market events, promotions, supply chain disruptions.
 
-## RAG System
+**Step 3 — AI Report**
+Groq's Llama 3.3 70B receives anomaly data + RAG context + Tavily results and generates a structured report with Summary, Root Cause, Severity, Recommended Action, and Confidence Level.
 
-Three knowledge-base documents live in `rag/knowledge_base/`:
+---
 
-- `data_quality_issues.txt` — explains why cancelled orders, guest purchases, price outliers, and bulk orders appear in the data
-- `ecommerce_metrics_guide.txt` — defines AOV, CLV, product velocity, z-score interpretation, and UK day-of-week patterns
-- `retail_anomaly_patterns.txt` — catalogues common causes of revenue spikes and drops: seasonal events, flash sales, viral demand, B2B orders, outages, and fraud
+## 📈 Results
+| Metric | Value |
+|--------|-------|
+| Raw rows processed | 1,067,371 |
+| Data quality score | 97.2% |
+| dbt models built | 6 |
+| dbt tests passing | 25/25 |
+| Confirmed anomalies | 12 |
+| Possible anomalies | 24 |
+| RAG knowledge chunks | 8 |
+| API endpoints | 7 |
 
-`rag/embed.py` chunks each document into 500-word overlapping windows and stores them in a ChromaDB collection (`datasense_knowledge`) using the default sentence-transformer embedding function.
+---
 
-At query time, `rag/retrieve.py` embeds the query and returns the top-3 most similar chunks by cosine similarity, along with source file, chunk index, and similarity score.
+## 🚀 Run It Yourself
 
-## AI Agent
+### Prerequisites
+- Python 3.10+
+- Node.js 18+
+- Snowflake account (free trial at snowflake.com)
+- Groq API key (free at console.groq.com)
+- Tavily API key (free at app.tavily.com)
 
-`agent/analyst.py` implements a three-step analysis pipeline called for each anomalous date:
-
-1. **RAG retrieval** — builds a query like `"retail revenue spike anomaly 85123A"` and retrieves the 3 most relevant knowledge-base chunks
-2. **Tavily web search** — searches for current context: `"UK retail ecommerce revenue spike 2010-12-01 causes"` to surface any external events that might explain the anomaly
-3. **Claude report** — sends all context (features, RAG chunks, web results) to `claude-opus-4-8` with adaptive thinking enabled and a structured JSON output format. The response includes: summary, anomaly category, confidence level, probable causes with likelihoods, recommended actions, data quality flags, and UK calendar context.
-
-Results are cached in memory so repeated requests for the same date are instant.
-
-## Setup Instructions
-
-### 1. Clone the repository
-
+### Steps
 ```bash
-git clone <repo-url>
+# 1. Clone
+git clone https://github.com/shiny-github/DataSense.git
 cd DataSense
-```
 
-### 2. Install Python dependencies
-
-```bash
+# 2. Install dependencies
 pip install -r requirements.txt
-```
 
-### 3. Fill in environment variables
+# 3. Fill in .env with your credentials
+cp .env .env.local
 
-Copy `.env` and fill in your credentials:
+# 4. Download dataset
+# Kaggle: UCI Online Retail II
+# Place CSV in data/raw/
 
-```
-SNOWFLAKE_ACCOUNT=your-account-identifier
-SNOWFLAKE_USER=your-username
-SNOWFLAKE_PASSWORD=your-password
-SNOWFLAKE_DATABASE=DATASENSE_DB
-SNOWFLAKE_SCHEMA=PUBLIC
-SNOWFLAKE_WAREHOUSE=COMPUTE_WH
-SNOWFLAKE_ROLE=ACCOUNTADMIN
-CLAUDE_API_KEY=sk-ant-...
-TAVILY_API_KEY=tvly-...
-```
-
-### 4. Download the dataset
-
-Download the **Online Retail II** dataset from [UCI ML Repository / Kaggle](https://www.kaggle.com/datasets/mashlyn/online-retail-ii-uci) and place it at:
-
-```
-data/raw/online_retail_II.csv
-```
-
-### 5. Ingest raw data into Snowflake
-
-```bash
+# 5. Run pipeline
 python pipeline/ingest.py
-```
-
-### 6. Validate the ingestion
-
-```bash
 python pipeline/validate.py
-```
-
-### 7. Run dbt transformations
-
-```bash
-cd dbt_project
-dbt run
-```
-
-### 8. Run dbt tests
-
-```bash
-dbt test
-cd ..
-```
-
-### 9. Detect anomalies
-
-```bash
+cd dbt_project && dbt run && dbt test && cd ..
 python pipeline/detect.py
-```
-
-### 10. Embed the knowledge base
-
-```bash
 python rag/embed.py
+
+# 6. Start backend
+uvicorn api.main:app --port 8000
+
+# 7. Start frontend
+cd dashboard && npm install && npm run dev
+
+# 8. Open http://localhost:5173
 ```
 
-### 11. Start the API
+---
 
-```bash
-uvicorn api.main:app --reload
-```
+## 📡 API Endpoints
 
-The API will be available at `http://localhost:8000`. Visit `http://localhost:8000/docs` for the interactive API explorer.
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | /health | Health check |
+| GET | /anomalies | List all anomalies |
+| GET | /anomalies/{date} | Get anomaly by date |
+| POST | /analyze/{date} | Trigger AI analysis |
+| GET | /metrics/daily | Daily revenue metrics |
+| GET | /products | Top 20 products |
+| GET | /customers | Customer segments |
+| GET | /pipeline/status | Pipeline health |
 
-### 12. Start the dashboard
+---
 
-```bash
-cd dashboard
-npm install
-npm run dev
-```
+## 🎯 Who Is This For?
+- Data engineers learning production-grade pipelines
+- Analytics engineers exploring dbt + Snowflake
+- Anyone building anomaly detection on real data
+- Developers who want to see RAG + AI agents applied to business data
 
-The dashboard will be available at `http://localhost:5173`.
+To run on your own data: replace the CSV with any transaction dataset, update the schema in sources.yml, and re-run the pipeline.
 
-## Project Structure
+---
 
-```
-DataSense/
-├── .env                        # Environment variables (fill before running)
-├── requirements.txt            # Python dependencies
-├── README.md                   # This file
-│
-├── data/
-│   └── raw/
-│       └── online_retail_II.csv   # Source dataset (download from Kaggle)
-│
-├── pipeline/
-│   ├── ingest.py               # Loads CSV into Snowflake RAW layer in batches
-│   ├── validate.py             # Runs data quality checks on the RAW table
-│   └── detect.py               # Applies z-score + IsolationForest; writes ANOMALY_RESULTS
-│
-├── dbt_project/
-│   └── models/
-│       ├── bronze/
-│       │   └── bronze_retail_raw.sql       # Verbatim view of the RAW source
-│       ├── silver/
-│       │   └── silver_retail_cleaned.sql   # Cleaned, flagged, enriched transactions
-│       └── gold/
-│           ├── gold_daily_revenue.sql       # Daily revenue by country
-│           ├── gold_product_velocity.sql    # Per-product daily sales + rolling avg
-│           ├── gold_customer_metrics.sql    # Customer RFM metrics and segments
-│           └── gold_anomaly_features.sql    # Per-day stats for anomaly detection
-│
-├── rag/
-│   ├── embed.py                # Chunks knowledge-base docs; writes to ChromaDB
-│   ├── retrieve.py             # Semantic search against ChromaDB collection
-│   └── knowledge_base/
-│       ├── data_quality_issues.txt         # Data quality patterns and explanations
-│       ├── ecommerce_metrics_guide.txt     # Metric definitions and benchmarks
-│       └── retail_anomaly_patterns.txt     # Spike/drop cause taxonomy
-│
-├── agent/
-│   └── analyst.py              # RAG + Tavily + Claude analysis pipeline
-│
-├── api/
-│   └── main.py                 # FastAPI app: health, anomalies, metrics, AI analysis
-│
-└── dashboard/
-    ├── package.json            # npm dependencies
-    ├── vite.config.js          # Vite build config
-    ├── index.html              # HTML entry point
-    ├── .env                    # VITE_API_URL
-    └── src/
-        ├── main.jsx            # React entry point
-        ├── App.jsx             # Router + Navbar + tab layout
-        ├── api.js              # Axios API client with all endpoint helpers
-        ├── components/
-        │   ├── Navbar.jsx      # Top bar: logo, pipeline status dot, timestamp
-        │   ├── KpiCard.jsx     # Reusable KPI metric card
-        │   └── SidePanel.jsx   # Sliding AI analysis panel (triggered per anomaly row)
-        └── pages/
-            ├── HomePage.jsx    # KPI cards + revenue chart + anomaly table
-            ├── ProductsPage.jsx   # Top-20 products horizontal bar chart
-            └── CustomersPage.jsx  # Customer segment pie chart + stats table
-```
-
-## License
-
+## 📄 License
 MIT
+
+---
+
+## 🙋 Author
+**Ananya Katram**
+MS Computer Science @ UT Arlington
+- LinkedIn: https://linkedin.com/in/ananya-katram
+- GitHub: https://github.com/shiny-github
