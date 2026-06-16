@@ -19,7 +19,7 @@ services:
         sync: false
       - key: SNOWFLAKE_ROLE
         sync: false
-      - key: CLAUDE_API_KEY
+      - key: GROQ_API_KEY
         sync: false
       - key: TAVILY_API_KEY
         sync: false

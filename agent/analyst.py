@@ -1,7 +1,7 @@
 import json
 import os
 
-import anthropic
+from groq import Groq
 from dotenv import load_dotenv
 from tavily import TavilyClient
 
@@ -9,9 +9,9 @@ from rag.retrieve import retrieve
 
 load_dotenv()
 
-MODEL = "claude-opus-4-8"
+MODEL = "llama-3.3-70b-versatile"
 
-_claude = anthropic.Anthropic(api_key=os.getenv("CLAUDE_API_KEY"))
+_groq   = Groq(api_key=os.getenv("GROQ_API_KEY"))
 _tavily = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
 
 
@@ -78,7 +78,7 @@ Return only the JSON.\
 
 def analyze(features: dict) -> dict:
     """
-    Full analysis pipeline: RAG + Tavily web search + Claude.
+    Full analysis pipeline: RAG + Tavily web search + Groq/Llama.
 
     Parameters
     ----------
@@ -111,23 +111,24 @@ def analyze(features: dict) -> dict:
     except Exception:
         web_results = []
 
-    # ── Claude ─────────────────────────────────────────────────────────────────
+    # ── Groq ───────────────────────────────────────────────────────────────────
     user_msg = _USER_TEMPLATE.format(
         features=_format_features(features),
         rag=_format_rag_hits(rag_hits),
         web=_format_web_results(web_results),
     )
 
-    with _claude.messages.stream(
+    response = _groq.chat.completions.create(
         model=MODEL,
-        max_tokens=2048,
-        thinking={"type": "adaptive"},
-        system=_SYSTEM,
-        messages=[{"role": "user", "content": user_msg}],
-    ) as stream:
-        final = stream.get_final_message()
+        messages=[
+            {"role": "system", "content": _SYSTEM},
+            {"role": "user",   "content": user_msg},
+        ],
+        temperature=0.3,
+        max_tokens=1000,
+    )
 
-    text = next((b.text for b in final.content if b.type == "text"), "")
+    text = response.choices[0].message.content
 
     try:
         result = json.loads(text)

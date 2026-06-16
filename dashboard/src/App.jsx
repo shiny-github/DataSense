@@ -5,6 +5,7 @@ import HomePage from './pages/HomePage'
 import ProductsPage from './pages/ProductsPage'
 import CustomersPage from './pages/CustomersPage'
 import { fetchHealth } from './api'
+import ErrorBoundary from './components/ErrorBoundary'
 
 const TAB_STYLE = ({ isActive }) => ({
   padding: '12px 24px',
@@ -58,11 +59,13 @@ export default function App() {
         </nav>
 
         <main style={{ padding: '24px', maxWidth: 1440, margin: '0 auto' }}>
-          <Routes>
-            <Route path="/"          element={<HomePage />} />
-            <Route path="/products"  element={<ProductsPage />} />
-            <Route path="/customers" element={<CustomersPage />} />
-          </Routes>
+          <ErrorBoundary>
+            <Routes>
+              <Route path="/"          element={<HomePage />} />
+              <Route path="/products"  element={<ProductsPage />} />
+              <Route path="/customers" element={<CustomersPage />} />
+            </Routes>
+          </ErrorBoundary>
         </main>
       </div>
     </BrowserRouter>

@@ -1,22 +1,13 @@
-from pathlib import Path
+import rag.embed as _embed
 
-import chromadb
-from chromadb.utils import embedding_functions
-
-CHROMA_PATH = "./chroma_db"
-COLLECTION  = "datasense_knowledge"
-TOP_K       = 3
-
-
-def get_collection():
-    client = chromadb.PersistentClient(path=CHROMA_PATH)
-    ef     = embedding_functions.DefaultEmbeddingFunction()
-    return client.get_collection(COLLECTION, embedding_function=ef)
+TOP_K = 3
 
 
 def retrieve(query: str, n_results: int = TOP_K) -> list[dict]:
-    collection = get_collection()
-    results    = collection.query(
+    col = _embed.collection
+    if col is None:
+        raise RuntimeError("Knowledge base not embedded — call embed.main() first")
+    results = col.query(
         query_texts=[query],
         n_results=n_results,
         include=["documents", "metadatas", "distances"],
@@ -28,10 +19,10 @@ def retrieve(query: str, n_results: int = TOP_K) -> list[dict]:
         results["distances"][0],
     ):
         hits.append({
-            "text":       text,
-            "source":     meta["source"],
+            "text":        text,
+            "source":      meta["source"],
             "chunk_index": meta["chunk_index"],
-            "score":      round(1 - dist, 4),   # cosine similarity ≈ 1 - distance
+            "score":       round(1 - dist, 4),
         })
     return hits
 
@@ -43,7 +34,6 @@ def print_results(query: str, hits: list[dict]) -> None:
         print(f"\n[Result {i}]  source={hit['source']}  "
               f"chunk={hit['chunk_index']}  score={hit['score']}")
         print("-" * 60)
-        # Print first 300 characters of the chunk for readability
         preview = hit["text"][:300]
         if len(hit["text"]) > 300:
             preview += " ..."
@@ -51,8 +41,8 @@ def print_results(query: str, hits: list[dict]) -> None:
     print("\n" + "=" * 60)
 
 
-# ── Inline test ───────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    query = "sudden revenue spike on a weekday"
-    hits  = retrieve(query)
-    print_results(query, hits)
+    from rag.embed import main as _embed_main
+    _embed_main()
+    hits = retrieve("sudden revenue spike on a weekday")
+    print_results("sudden revenue spike on a weekday", hits)

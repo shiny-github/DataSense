@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import Plot from 'react-plotly.js'
+import PlotWrapper from '../components/PlotWrapper'
 import { fetchProducts } from '../api'
 
 export default function ProductsPage() {
@@ -51,7 +51,7 @@ export default function ProductsPage() {
 
   return (
     <div style={{ background: '#1a1d27', border: '1px solid #2d3148', borderRadius: 12, overflow: 'hidden' }}>
-      <Plot
+      <PlotWrapper
         data={[trace]}
         layout={layout}
         config={{ displayModeBar: false, responsive: true }}

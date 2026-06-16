@@ -19,11 +19,11 @@ clean-targets:
 models:
   datasense_dbt:
     bronze:
-      +schema: bronze
+      +schema: PUBLIC_BRONZE
       +materialized: view
     silver:
-      +schema: silver
+      +schema: PUBLIC_SILVER
       +materialized: table
     gold:
-      +schema: gold
+      +schema: PUBLIC_GOLD
       +materialized: table

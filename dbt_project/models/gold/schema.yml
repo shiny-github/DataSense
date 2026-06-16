@@ -22,13 +22,15 @@ models:
         tests:
           - not_null
           - dbt_utils.expression_is_true:
-              expression: "> 0"
+              arguments:
+                expression: "> 0"
 
       - name: total_orders
         description: "Count of distinct InvoiceNo values for that date and country."
         tests:
           - dbt_utils.expression_is_true:
-              expression: "> 0"
+              arguments:
+                expression: "> 0"
 
       - name: unique_customers
         description: "Count of distinct non-GUEST CustomerIDs transacting on that date and country."
@@ -78,7 +80,8 @@ models:
         tests:
           - not_null
           - dbt_utils.expression_is_true:
-              expression: "> 0"
+              arguments:
+                expression: "> 0"
 
       - name: daily_revenue
         description: "Sum of TotalRevenue for this product on this date."
@@ -114,7 +117,8 @@ models:
         tests:
           - not_null
           - dbt_utils.expression_is_true:
-              expression: "> 0"
+              arguments:
+                expression: "> 0"
 
       - name: total_orders
         description: "Count of distinct InvoiceNo values placed by this customer."

@@ -53,7 +53,8 @@ models:
         tests:
           - not_null
           - dbt_utils.expression_is_true:
-              expression: "> 0"
+              arguments:
+                expression: "> 0"
 
       - name: InvoiceMonth
         description: "Calendar month number (1–12) extracted from InvoiceDate."

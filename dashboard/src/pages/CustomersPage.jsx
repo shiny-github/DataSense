@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import Plot from 'react-plotly.js'
+import PlotWrapper from '../components/PlotWrapper'
 import { fetchCustomers } from '../api'
 
 const SEG_COLOR = {
@@ -63,7 +63,7 @@ export default function CustomersPage() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Pie chart */}
       <div style={{ background: '#1a1d27', border: '1px solid #2d3148', borderRadius: 12, overflow: 'hidden' }}>
-        <Plot
+        <PlotWrapper
           data={[pieTrace]}
           layout={layout}
           config={{ displayModeBar: false, responsive: true }}

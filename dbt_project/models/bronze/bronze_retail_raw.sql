@@ -8,4 +8,4 @@ SELECT
     CustomerID,
     Country,
     CURRENT_TIMESTAMP() AS _loaded_at
-FROM {{ source('retail', 'online_retail_ii') }}
+FROM {{ source('raw', 'ONLINE_RETAIL_II') }}

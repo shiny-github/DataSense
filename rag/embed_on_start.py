@@ -1,35 +1,26 @@
-"""Auto-embed the knowledge base on startup if ChromaDB is absent or empty."""
+"""Embed the knowledge base into in-memory ChromaDB on every server start."""
 import logging
 
-import chromadb
-from chromadb.utils import embedding_functions
-
 log = logging.getLogger("datasense.rag")
-
-CHROMA_PATH = "./chroma_db"
-COLLECTION  = "datasense_knowledge"
 
 
 def ensure_embedded() -> None:
     """
-    Check whether the ChromaDB collection already has documents.
-    If the collection is missing or empty, run the full embedding pipeline.
-    Called from the FastAPI lifespan so Render cold starts work without
-    a manual pre-build step.
+    Build the in-memory ChromaDB collection from the knowledge base txt files.
+    EphemeralClient data is lost on process exit, so this runs on every cold
+    start before the app accepts requests.  Skips if already populated (i.e.,
+    called a second time within the same process).
     """
-    client = chromadb.PersistentClient(path=CHROMA_PATH)
-    ef     = embedding_functions.DefaultEmbeddingFunction()
+    from rag import embed
 
-    try:
-        col   = client.get_collection(COLLECTION, embedding_function=ef)
-        count = col.count()
+    if embed.collection is not None:
+        count = embed.collection.count()
         if count > 0:
-            log.info("ChromaDB '%s' ready — %d chunks already embedded.", COLLECTION, count)
+            log.info("Knowledge base already in memory — %d chunks ready.", count)
             return
-    except Exception:
-        pass
 
-    log.info("ChromaDB collection missing or empty — running embedding pipeline…")
-    from rag.embed import main as _embed
-    _embed()
-    log.info("Knowledge base embedding complete.")
+    log.info("Embedding knowledge base into memory…")
+    embed.main()
+
+    count = embed.collection.count() if embed.collection is not None else 0
+    log.info("Knowledge base embedded: %d chunks ready", count)

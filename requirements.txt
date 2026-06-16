@@ -5,7 +5,7 @@ numpy
 scikit-learn
 xgboost
 chromadb
-anthropic
+groq
 tavily-python
 fastapi
 uvicorn[standard]

@@ -20,11 +20,11 @@ log = logging.getLogger("datasense.api")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
 RESULT_TABLE   = "DATASENSE_DB.PUBLIC.ANOMALY_RESULTS"
-FEATURE_TABLE  = "DATASENSE_DB.PUBLIC.GOLD_ANOMALY_FEATURES"
-SILVER_TABLE   = "DATASENSE_DB.PUBLIC.SILVER_RETAIL_CLEANED"
+FEATURE_TABLE  = "DATASENSE_DB.PUBLIC_PUBLIC_GOLD.GOLD_ANOMALY_FEATURES"
+SILVER_TABLE   = "DATASENSE_DB.PUBLIC_PUBLIC_SILVER.SILVER_RETAIL_CLEANED"
 RAW_TABLE      = "DATASENSE_DB.RAW.ONLINE_RETAIL_II"
-PRODUCT_TABLE  = "DATASENSE_DB.PUBLIC.GOLD_PRODUCT_VELOCITY"
-CUSTOMER_TABLE = "DATASENSE_DB.PUBLIC.GOLD_CUSTOMER_METRICS"
+PRODUCT_TABLE  = "DATASENSE_DB.PUBLIC_PUBLIC_GOLD.GOLD_PRODUCT_VELOCITY"
+CUSTOMER_TABLE = "DATASENSE_DB.PUBLIC_PUBLIC_GOLD.GOLD_CUSTOMER_METRICS"
 
 _analysis_cache: dict[str, dict] = {}
 
@@ -52,7 +52,8 @@ def _rows_as_dicts(cur) -> list[dict]:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Ensure ChromaDB knowledge base is populated (auto-embeds on first run / cold start)
+    # Embed knowledge base into in-memory ChromaDB before accepting requests.
+    # EphemeralClient data is lost on process exit, so this always runs on cold start.
     await asyncio.to_thread(ensure_embedded)
 
     # Verify Snowflake reachability (non-fatal)

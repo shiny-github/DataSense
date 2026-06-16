@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import Plot from 'react-plotly.js'
+import PlotWrapper from '../components/PlotWrapper'
 import KpiCard from '../components/KpiCard'
 import SidePanel from '../components/SidePanel'
 import { fetchMetricsDaily, fetchPipelineStatus } from '../api'
@@ -207,7 +207,7 @@ export default function HomePage() {
             Loading chart…
           </div>
         ) : (
-          <Plot
+          <PlotWrapper
             data={[mainTrace, confirmedTrace, possibleTrace]}
             layout={chartLayout}
             config={{ displayModeBar: false, responsive: true }}

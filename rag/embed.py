@@ -1,19 +1,21 @@
-import os
 from pathlib import Path
 
 import chromadb
 from chromadb.utils import embedding_functions
 
-KNOWLEDGE_DIR  = Path("rag/knowledge_base")
-CHROMA_PATH    = "./chroma_db"
-COLLECTION     = "datasense_knowledge"
-CHUNK_WORDS    = 500
-OVERLAP_WORDS  = 50
+KNOWLEDGE_DIR = Path("rag/knowledge_base")
+COLLECTION    = "datasense_knowledge"
+CHUNK_WORDS   = 500
+OVERLAP_WORDS = 50
+
+# Module-level singletons populated by main(); retrieve.py reads these directly.
+client     = None
+collection = None
 
 
 def chunk_text(text: str, chunk_size: int, overlap: int) -> list[str]:
-    words = text.split()
-    step  = chunk_size - overlap
+    words  = text.split()
+    step   = chunk_size - overlap
     chunks = []
     for start in range(0, len(words), step):
         chunk = words[start : start + chunk_size]
@@ -25,15 +27,16 @@ def chunk_text(text: str, chunk_size: int, overlap: int) -> list[str]:
 
 
 def main():
+    global client, collection
+
     txt_files = sorted(KNOWLEDGE_DIR.glob("*.txt"))
     if not txt_files:
         print(f"No .txt files found in {KNOWLEDGE_DIR}")
         return
 
-    client = chromadb.PersistentClient(path=CHROMA_PATH)
+    client = chromadb.EphemeralClient()
     ef     = embedding_functions.DefaultEmbeddingFunction()
 
-    # Delete and recreate for idempotent runs
     try:
         client.delete_collection(COLLECTION)
     except Exception:
@@ -41,19 +44,14 @@ def main():
     collection = client.create_collection(COLLECTION, embedding_function=ef)
 
     total_chunks = 0
-
     for txt_path in txt_files:
         text   = txt_path.read_text(encoding="utf-8")
         chunks = chunk_text(text, CHUNK_WORDS, OVERLAP_WORDS)
 
-        ids        = [f"{txt_path.stem}__chunk_{i}" for i in range(len(chunks))]
-        metadatas  = [
-            {
-                "source":      txt_path.name,
-                "chunk_index": i,
-                "word_count":  len(chunk.split()),
-            }
-            for i, chunk in enumerate(chunks)
+        ids       = [f"{txt_path.stem}__chunk_{i}" for i in range(len(chunks))]
+        metadatas = [
+            {"source": txt_path.name, "chunk_index": i, "word_count": len(c.split())}
+            for i, c in enumerate(chunks)
         ]
 
         collection.add(documents=chunks, ids=ids, metadatas=metadatas)
@@ -61,7 +59,6 @@ def main():
         total_chunks += len(chunks)
 
     print(f"\n{total_chunks} chunks embedded from {len(txt_files)} files.")
-    print(f"ChromaDB collection '{COLLECTION}' saved to {CHROMA_PATH}/")
 
 
 if __name__ == "__main__":

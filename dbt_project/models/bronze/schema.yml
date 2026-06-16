@@ -1,12 +1,12 @@
 version: 2
 
 sources:
-  - name: retail
+  - name: raw
     description: "Raw Online Retail II data loaded into Snowflake"
-    database: "{{ env_var('SNOWFLAKE_DATABASE') }}"
-    schema: "{{ env_var('SNOWFLAKE_SCHEMA') }}"
+    database: DATASENSE_DB
+    schema: RAW
     tables:
-      - name: online_retail_ii
+      - name: ONLINE_RETAIL_II
         description: "UCI Online Retail II transactional dataset"
 
 models:
