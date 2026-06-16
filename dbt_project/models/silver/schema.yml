@@ -1,0 +1,86 @@
+version: 2
+
+models:
+  - name: silver_retail_cleaned
+    description: >
+      Cleaned and enriched retail transactions derived from bronze_retail_raw.
+      Applies null-dropping, value imputation, cancellation removal, whitespace
+      normalisation, timestamp parsing, revenue derivation, calendar enrichment,
+      and data-quality outlier flagging. Rows are never removed during flagging.
+    columns:
+      - name: InvoiceNo
+        description: "Original invoice number. Cancelled orders (prefix 'C') are excluded."
+
+      - name: StockCode
+        description: "Product code with leading/trailing whitespace trimmed."
+        tests:
+          - not_null
+
+      - name: Description
+        description: "Product description, whitespace-trimmed. Nulls filled with 'UNKNOWN'."
+
+      - name: Quantity
+        description: "Units ordered. Rows with Quantity <= 0 are excluded."
+
+      - name: InvoiceDate
+        description: "Invoice timestamp parsed to TIMESTAMP_NTZ. Rows with null InvoiceDate are excluded upstream."
+        tests:
+          - not_null
+
+      - name: UnitPrice
+        description: >
+          Unit price in GBP. Null values are imputed with the median UnitPrice for
+          the same StockCode. Rows where price remains null after imputation are excluded.
+          Rows with UnitPrice <= 0 are also excluded.
+
+      - name: CustomerID
+        description: "Customer identifier as VARCHAR. Null values are replaced with 'GUEST'."
+        tests:
+          - not_null
+
+      - name: is_guest_purchase
+        description: "TRUE when the original CustomerID was null (i.e. guest/anonymous transaction)."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [true, false]
+
+      - name: Country
+        description: "Customer country in title case. Nulls filled with 'UNSPECIFIED'."
+
+      - name: TotalRevenue
+        description: "Derived revenue for the line: Quantity * UnitPrice."
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "> 0"
+
+      - name: InvoiceMonth
+        description: "Calendar month number (1–12) extracted from InvoiceDate."
+
+      - name: InvoiceYear
+        description: "Four-digit calendar year extracted from InvoiceDate."
+
+      - name: DayOfWeek
+        description: "Full English day name (Monday … Sunday) derived from InvoiceDate."
+
+      - name: IsWeekend
+        description: "TRUE when DayOfWeek is Saturday or Sunday."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [true, false]
+
+      - name: data_quality_flag
+        description: >
+          Comma-separated list of applicable outlier flags.
+          Possible values: 'price_outlier' (UnitPrice above dataset 99th pct),
+          'bulk_order' (Quantity above dataset 99th pct),
+          'high_value_transaction' (TotalRevenue > 10,000).
+          NULL when no flags apply.
+
+      - name: is_flagged
+        description: "TRUE when at least one data_quality_flag applies to the row."
+
+      - name: _loaded_at
+        description: "Load timestamp propagated from the bronze layer."

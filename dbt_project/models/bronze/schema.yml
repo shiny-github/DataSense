@@ -1,0 +1,42 @@
+version: 2
+
+sources:
+  - name: retail
+    description: "Raw Online Retail II data loaded into Snowflake"
+    database: "{{ env_var('SNOWFLAKE_DATABASE') }}"
+    schema: "{{ env_var('SNOWFLAKE_SCHEMA') }}"
+    tables:
+      - name: online_retail_ii
+        description: "UCI Online Retail II transactional dataset"
+
+models:
+  - name: bronze_retail_raw
+    description: >
+      Raw Online Retail II transactions selected verbatim from the source table.
+      No filtering, cleaning, or transformation is applied. A metadata timestamp
+      column is appended to track load time.
+    columns:
+      - name: InvoiceNo
+        description: "Unique invoice number. Codes beginning with 'C' indicate a cancellation."
+        tests:
+          - not_null
+      - name: StockCode
+        description: "Unique 5-digit product code assigned per item."
+        tests:
+          - not_null
+      - name: Description
+        description: "Product name as provided in the source."
+      - name: Quantity
+        description: "Number of units per transaction. Negative values indicate returns."
+      - name: InvoiceDate
+        description: "Date and time the invoice was generated."
+        tests:
+          - not_null
+      - name: UnitPrice
+        description: "Price per unit in GBP sterling."
+      - name: CustomerID
+        description: "Unique customer identifier. Nullable for guest transactions."
+      - name: Country
+        description: "Country where the customer resides."
+      - name: _loaded_at
+        description: "Timestamp when the row was loaded into the bronze layer (current_timestamp at query time)."

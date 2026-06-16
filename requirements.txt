@@ -1,0 +1,14 @@
+dbt-snowflake
+snowflake-connector-python
+pandas
+numpy
+scikit-learn
+xgboost
+chromadb
+anthropic
+tavily-python
+fastapi
+uvicorn[standard]
+python-dotenv
+plotly
+scipy

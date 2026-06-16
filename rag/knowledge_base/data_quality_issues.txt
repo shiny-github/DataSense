@@ -1,0 +1,50 @@
+DATA QUALITY ISSUES IN RETAIL TRANSACTION DATASETS
+===================================================
+
+WHY CANCELLED ORDERS APPEAR IN TRANSACTION DATA
+
+In many retail systems, an order cancellation is not a deletion of the original record but the creation of a new compensating transaction. The Online Retail II dataset follows this pattern: cancelled orders are identified by an InvoiceNo that begins with the letter C. The quantity and price values on a cancellation record are typically identical to the original order but with negative signs, so that the sum of the original and cancellation transactions nets to zero.
+
+Analysts who do not filter cancelled orders before aggregating revenue will systematically overstate gross transaction volume while arriving at a net revenue figure that only appears correct by coincidence of the cancellation timing. The silver model in DataSense filters out all InvoiceNo values beginning with C precisely because including them in daily revenue aggregates creates misleading spikes on days when a large prior order is cancelled and a fresh order is placed simultaneously.
+
+The ratio of cancelled to total orders is itself a meaningful metric that is discarded by this filter. High cancellation rates can indicate fulfilment problems, product quality issues, or customers using the site to reserve stock they later decide not to purchase. The raw bronze layer preserves these records for this reason.
+
+GUEST VS REGISTERED CUSTOMER BEHAVIOUR DIFFERENCES
+
+A guest purchase is one where no CustomerID was recorded at the time of transaction. In the DataSense silver model, null CustomerID values are replaced with the string GUEST and the is_guest_purchase flag is set to true. Understanding the distinction between guest and registered behaviour is important for multiple downstream analyses.
+
+Guest customers cannot be tracked across sessions. Their total_spend, orders_per_month, and days_since_last_purchase values in the customer metrics model are undefined because each guest transaction appears as an independent event with no linkage to prior or future purchases. This means the gold_customer_metrics model, which excludes GUEST records entirely, represents only the identifiable subset of the customer base.
+
+Guest purchases tend to cluster around promotional events where customers arrive from price comparison sites or affiliate channels and complete a one-time purchase without registering. Their average order values are often slightly lower than registered customers because they lack access to loyalty discounts and personalised recommendations. When the proportion of guest transactions increases sharply on a given day, this frequently signals a new traffic source such as an affiliate campaign or a price comparison listing.
+
+PRICE OUTLIERS: LEGITIMATE B2B VS DATA ERRORS
+
+The UnitPrice distribution in retail datasets is typically long-tailed: the majority of products are priced under fifty pounds, but a small number of high-value items generate substantial revenue per unit. In the DataSense silver model, UnitPrice values above the 99th percentile are flagged with the price_outlier data quality flag but are not removed.
+
+Legitimate high-price outliers arise in two main scenarios. First, genuine premium products: a single high-end item with a unit price of several hundred pounds is entirely valid and should be retained in revenue calculations. Second, B2B bulk pricing: some retailers use the unit price field to encode total contract value rather than per-unit cost when processing large corporate orders, producing artificially elevated UnitPrice figures.
+
+Illegitimate price outliers, which represent data errors, typically manifest as UnitPrice values that are extreme multiples of the product's normal price with no corresponding justification in surrounding transactions. A product that normally sells for three pounds appearing with a UnitPrice of three thousand pounds on a single transaction is almost certainly a data entry error. Comparing the outlier transaction's price against the median UnitPrice for the same StockCode, available via the window function imputation logic in the silver model, is the most reliable method for distinguishing genuine premium pricing from data corruption.
+
+BULK ORDER PATTERNS: WHOLESALERS VS RETAIL FRAUD
+
+Extreme Quantity values appear in retail datasets for two very different reasons. Legitimate wholesale customers routinely order hundreds or thousands of units of consumable items such as packaging materials, seasonal decorations, or catering supplies. The distinguishing characteristics of legitimate bulk orders are: the CustomerID has a long purchase history, the StockCode is a commodity item with a low UnitPrice, and the order is consistent with the customer's prior purchase patterns.
+
+Fraudulent bulk orders, by contrast, typically involve a CustomerID with no prior history or a very recent first_purchase_date, an order for high-value items rather than low-cost commodities, and shipping to an address in an unusual geography relative to the retailer's typical customer base. The bulk_order flag in the data_quality_flag column surfaces all high-quantity transactions for review without prejudging their legitimacy.
+
+MISSING DESCRIPTION PATTERNS AND WHAT THEY MEAN
+
+Null or absent product descriptions in the Online Retail II dataset arise from several sources. Administrative and non-product transactions such as postage charges, bank transfer fees, and manual adjustments are often entered without descriptions because they are processed by internal staff rather than through the standard product catalogue. The DataSense silver model filters out known non-product StockCodes explicitly (POST, DOT, BANK CHARGES, AMAZONFEE, and others), which removes the majority of these records.
+
+For legitimate product stock codes with missing descriptions, the most common cause is legacy catalogue migration: products that were active in an older system version retained their StockCode but lost their description text during a platform upgrade. The silver model fills null descriptions with the value UNKNOWN to preserve these records in the dataset. Analysts should be aware that UNKNOWN descriptions concentrate in older transaction periods and are not uniformly distributed across time.
+
+MULTI-CURRENCY ISSUES IN INTERNATIONAL RETAIL
+
+The Online Retail II dataset denominates all UnitPrice values in British pounds sterling regardless of the customer's country. This means that revenue aggregations in the gold layer represent GBP revenue consistently, which simplifies comparison across countries. However, it also means that price sensitivity analysis by country requires adjusting for the prevailing exchange rate at the time of purchase, which is not available in the dataset itself.
+
+The Country field in the silver model is title-cased and has null values filled with UNSPECIFIED. The wide geographic distribution of customers, spanning Europe, Australia, and beyond, reflects the international reach of the original UK-based retailer. Revenue from non-UK countries should be interpreted with awareness that the sterling pricing may not reflect local market pricing, making direct country-to-country revenue comparisons potentially misleading.
+
+HOW TO INTERPRET NEGATIVE QUANTITIES
+
+Negative Quantity values in retail transaction data serve three primary purposes. First, they record product returns: a customer returns goods and receives a refund, which is captured as a transaction with negative Quantity and the same UnitPrice as the original sale. Second, they record stock adjustments made by warehouse staff to correct inventory counts, which should not appear in revenue calculations. Third, they are the quantity component of cancellation records, paired with InvoiceNo values beginning with C.
+
+The DataSense silver model removes all rows where Quantity is less than or equal to zero. This is appropriate for revenue analysis because negative quantities represent reversals of prior sales rather than new economic activity. However, the return rate derived from the removed negative-quantity records is a valuable operational metric in its own right. A sudden increase in return volume for a specific StockCode often indicates a product quality problem that will not be visible in the cleaned silver or gold models, and analysts who need return rate analysis should work from the bronze layer directly.

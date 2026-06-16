@@ -1,0 +1,52 @@
+ECOMMERCE METRICS GUIDE FOR DATA ANALYSTS
+==========================================
+
+AVERAGE ORDER VALUE (AOV)
+
+Average Order Value is defined as total revenue divided by the number of distinct orders in a given period. It is one of the three primary levers of ecommerce revenue alongside traffic volume and conversion rate. AOV is calculated at the invoice level: each unique InvoiceNo represents one order, and AOV equals the sum of all line-item revenues within that invoice.
+
+Healthy AOV ranges vary substantially by product category. For a UK gift and homeware retailer such as the one represented in the Online Retail II dataset, typical AOV falls between fifteen and forty-five pounds. An AOV below ten pounds suggests customers are making small impulse purchases, often driven by free shipping thresholds being set too low. An AOV above one hundred pounds may indicate that the site's customer mix has shifted toward B2B wholesale buyers rather than retail consumers.
+
+Causes of AOV Spikes: Bundle promotions and cross-sell recommendations are the most common intentional causes of rising AOV. An AOV spike that coincides with the introduction of a "buy three get one free" promotion is expected and healthy. An unexplained AOV spike with no concurrent promotional event warrants investigation because it may indicate that a small number of very high-value orders are distorting the metric. In the DataSense pipeline, the high_value_transaction flag in the data_quality_flag column is specifically designed to surface these outliers.
+
+Causes of AOV Drops: When AOV falls, the most common explanations are a shift toward lower-priced product mix, an influx of new or first-time customers (who tend to place smaller exploratory orders), or aggressive discounting that reduces the per-unit price without proportionally increasing volume.
+
+CUSTOMER LIFETIME VALUE (CLV)
+
+Customer Lifetime Value is the total revenue attributed to a single customer across their entire relationship with the retailer. In the DataSense gold_customer_metrics model, the total_spend column is the historical CLV for each identified customer. CLV is most useful when segmented by acquisition channel, geography, or time cohort. A customer acquired during a flash sale often has a lower CLV than one acquired through organic search because promotional customers tend to return only when further discounts are offered.
+
+The orders_per_month metric is a proxy for purchase frequency, which is one of the three components of the RFM (Recency, Frequency, Monetary) segmentation framework. High frequency combined with high total_spend defines the VIP segment in the customer_segment column. Days_since_last_purchase measures recency: a VIP customer who has not purchased in ninety days is at risk of churn and represents a high-value retention target.
+
+PRODUCT VELOCITY
+
+Product velocity refers to the rate at which units of a product sell over a defined time window. In the gold_product_velocity model, units_sold represents daily velocity and units_7day_rolling_avg smooths out day-to-day noise to reveal the underlying trend. Products in the top ten percent of daily units sold are flagged as is_fast_mover.
+
+Fast Movers vs Slow Movers: Fast-moving products require tight inventory management because stockouts create immediate revenue loss. Slow-moving products tie up working capital and warehouse space but often carry higher margins. A sudden transition from slow to fast mover status, visible as a sharp increase in the units_7day_rolling_avg, is an early indicator of viral demand or successful promotional targeting and should trigger an inventory review.
+
+Revenue Rank: The revenue_rank column assigns each product a lifetime revenue rank across the entire dataset. Products ranked in the top twenty by revenue typically account for the majority of total sales, reflecting the Pareto principle. Monitoring whether the top_product_that_day in the anomaly features table matches the expected high-rank products is a useful sanity check: if an obscure product with a high revenue_rank number suddenly becomes the top seller for the day, it merits investigation.
+
+Z-SCORE INTERPRETATION IN RETAIL CONTEXT
+
+A z-score measures how many standard deviations a data point lies from the population mean. In the context of daily retail revenue, a z-score of zero means the day's revenue exactly matched the historical average. A z-score of two means the revenue was two standard deviations above average, which statistically occurs in approximately two and a half percent of observations under a normal distribution.
+
+The threshold of 2.5 used in the DataSense anomaly model is a conventional choice balancing sensitivity against false positive rate. At z = 2.5, approximately one percent of days would be flagged as anomalous by chance alone if revenue were normally distributed. In practice, retail revenue is not normally distributed: it is right-skewed due to holiday spikes and exhibits autocorrelation due to weekly cycles. This means the 2.5 threshold will produce slightly more false positives around holiday periods and should be interpreted in conjunction with calendar context.
+
+A confirmed anomaly in DataSense requires both the statistical z-score threshold and the IsolationForest model to agree. This dual-method confirmation significantly reduces false positive rates because IsolationForest considers the multivariate relationship between revenue, order count, customer count, and day-over-day change simultaneously.
+
+DAY OF WEEK PATTERNS IN ECOMMERCE
+
+UK ecommerce consistently shows lower revenue on Saturdays and Sundays for B2B-oriented retailers, because corporate purchasing decisions are made during the working week. Consumer retailers show the opposite pattern: Sunday evenings are peak browsing and purchasing periods. The Online Retail II dataset reflects a predominantly B2C gifting and homeware business and therefore may show elevated weekend activity toward Christmas. The is_weekend flag in gold_anomaly_features allows anomaly analysis to control for this structural pattern.
+
+Monday typically shows a post-weekend recovery spike in B2C ecommerce as customers complete purchases they were browsing over the weekend. Tuesday through Thursday represent the steadiest trading days. Friday shows a partial decline as customers move into weekend mode. Any anomaly model that does not account for day-of-week effects will systematically flag weekends and Mondays as anomalies even when trading is entirely normal.
+
+UK HOLIDAY CALENDAR EFFECTS
+
+Christmas (December 25th): Zero or near-zero transactions as the platform is typically closed or unattended. The spike occurs in the week before, not on the day itself.
+
+Boxing Day (December 26th): Major sale event for UK retailers. Often the highest single-day revenue of the year in homeware and gifts.
+
+Black Friday (fourth Friday of November): Strong spike, often spread across the entire week as retailers run extended promotions.
+
+January Sales: Revenue in January drops sharply from December peaks. The first two weeks of January represent a structural trough, not an anomaly.
+
+Easter: A moderate uplift in gifting categories around the Easter weekend, particularly for food-adjacent and homeware products.

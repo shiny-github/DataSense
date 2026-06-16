@@ -1,0 +1,40 @@
+RETAIL REVENUE ANOMALY PATTERNS
+================================
+
+COMMON CAUSES OF REVENUE SPIKES IN RETAIL
+
+Holiday and Seasonal Events
+The most predictable revenue spikes occur around culturally significant dates. In UK retail, the Christmas shopping window from late November through December 24th routinely produces daily revenues two to five times the annual baseline. Boxing Day (December 26th) is particularly pronounced in UK ecommerce because it historically marks the start of major clearance sales. Black Friday, though American in origin, has become the single highest-revenue day for most UK online retailers. The pattern is distinct: revenue climbs steeply in the two weeks before Black Friday, peaks sharply, then falls back before climbing again toward Christmas. Any z-score model must account for this calendar structure or it will treat every holiday spike as an anomaly.
+
+Flash Sales and Promotional Events
+Retailer-initiated flash sales produce short, sharp spikes that differ from holiday patterns in one key way: they occur on days that carry no external calendar significance. A 24-hour promotion launched on a Tuesday in March will appear as a genuine statistical outlier. These events are identifiable in retrospect because they affect a wide range of stock codes simultaneously and show elevated average order values as customers top up baskets to qualify for thresholds.
+
+Viral and Influencer-Driven Demand
+When a product is featured by a social media influencer or mentioned in mainstream media, demand for a single stock code can increase by orders of magnitude within hours. The revenue spike from viral products is concentrated on a small number of stock codes, often just one, whereas holiday spikes are distributed broadly. This makes the top_product_that_day field in the anomaly features table a critical diagnostic signal. If a single product accounts for more than thirty percent of the day's revenue and that day is flagged as anomalous, a viral event is the most likely explanation.
+
+Bulk B2B Orders
+Online retail platforms frequently serve wholesale and corporate customers alongside retail consumers. A single B2B order for thousands of units of a low-cost consumable item can elevate daily revenue substantially. These orders typically show a single InvoiceNo with extreme Quantity values and a CustomerID that has an unusually high orders_per_month ratio in the customer metrics table. The is_guest_purchase flag will generally be false for B2B customers because they tend to have registered accounts.
+
+COMMON CAUSES OF REVENUE DROPS
+
+Supply Chain Disruptions
+When a supplier fails to deliver stock, the revenue impact emerges gradually. The anomaly signature is a slow decline over several days rather than a sudden drop. If the top-selling product category disappears from the velocity table, supply constraint is more likely than demand erosion.
+
+Competitor Promotions
+A major promotion by a competitor can shift demand away from a retailer for the duration of that event. The distinctive characteristic is that the revenue drop coincides with a competitor's known sale period and resolves when that promotion ends. The internal data alone cannot confirm this cause, which is why the RAG system's web search capability is useful for contextualising anomalies with external market data.
+
+Website and Payment Processor Outages
+Technical failures produce the sharpest possible revenue drops: revenue falls to near zero for several hours, then recovers. A partial outage affects checkout but not browsing, producing lower conversion rates. In the transaction data, an outage appears as a gap in InvoiceDate values followed by a burst of orders as backlogged customers complete purchases. Day-over-day change percentage for outage days will be strongly negative, and the following day will often show a compensating spike.
+
+Seasonal Slowdowns
+January in UK retail is historically the lowest revenue month. The post-Christmas slowdown is not an anomaly but a structural seasonal pattern. Any anomaly detection model should be evaluated against whether it is flagging genuine outliers or simply failing to account for known seasonality.
+
+DISTINGUISHING ONE-TIME SPIKES FROM TREND CHANGES
+
+A one-time spike returns to the prior baseline within one to three days. A trend change does not. The seven-day rolling average is the most reliable signal: if the rolling average remains elevated after the spike date, the underlying demand level has shifted. The revenue_dod_change_pct column is noisy on a day-by-day basis but when the rolling average itself starts trending upward, this signals a structural shift rather than a single event.
+
+Z-scores computed over the entire dataset are sensitive to when in the time series the anomaly occurs. A spike in December 2009 and an identical spike in December 2011 will receive the same z-score even though the second spike occurs in a period when the business may have grown substantially. For a more robust detection approach, computing the z-score against a rolling ninety-day window rather than the full dataset mean accounts for business growth trends.
+
+FRAUD PATTERNS
+
+Unusual bulk orders from a single customer in a short time window are a primary fraud indicator. A legitimate wholesale customer places large orders on a regular schedule. A fraud attempt typically looks like a cluster of unusually large orders placed over one to three days from a single CustomerID or a set of CustomerIDs sharing similar Country values. The combination of high Quantity, high UnitPrice, and a CustomerID with no prior purchase history in the first_purchase_date column is the strongest fraud signal available from transaction data alone. Abnormal geographies also serve as an indicator: if a customer's Country value is inconsistent with the retailer's typical market (for this dataset, predominantly UK and Western Europe), manual review is warranted. Cancelled orders (InvoiceNo starting with C) that mirror large positive orders placed minutes earlier can indicate attempted fraud where the fraudulent order was partially intercepted.

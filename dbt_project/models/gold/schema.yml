@@ -1,0 +1,199 @@
+version: 2
+
+models:
+
+  # ---------------------------------------------------------------------------
+  - name: gold_daily_revenue
+    description: >
+      Daily revenue aggregated by date and country, enriched with rolling
+      averages, day-over-day change, z-score anomaly detection, and an
+      anomaly flag. One row per (sale_date, Country) combination.
+    columns:
+      - name: sale_date
+        description: "Calendar date of the invoices (time portion stripped from InvoiceDate)."
+        tests:
+          - not_null
+
+      - name: Country
+        description: "Customer country, title-cased, as inherited from the silver layer."
+
+      - name: total_revenue
+        description: "Sum of TotalRevenue across all line items for that date and country."
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "> 0"
+
+      - name: total_orders
+        description: "Count of distinct InvoiceNo values for that date and country."
+        tests:
+          - dbt_utils.expression_is_true:
+              expression: "> 0"
+
+      - name: unique_customers
+        description: "Count of distinct non-GUEST CustomerIDs transacting on that date and country."
+
+      - name: avg_order_value
+        description: "total_revenue divided by total_orders; null-safe against zero orders."
+
+      - name: revenue_7day_rolling_avg
+        description: >
+          7-day trailing average of total_revenue partitioned by Country,
+          ordered by sale_date. Includes the current day (ROWS BETWEEN 6 PRECEDING AND CURRENT ROW).
+
+      - name: revenue_dod_change_pct
+        description: >
+          Day-over-day percentage change in total_revenue relative to the previous
+          trading date for the same country. NULL on the first date per country.
+
+      - name: revenue_zscore
+        description: >
+          Standard-score of total_revenue computed globally across all
+          (date, country) rows: (value - global_mean) / global_stddev.
+          Values beyond ±2.5 are treated as anomalous.
+
+      - name: is_anomaly_day
+        description: "TRUE when ABS(revenue_zscore) > 2.5, indicating an unusually high or low revenue day."
+
+  # ---------------------------------------------------------------------------
+  - name: gold_product_velocity
+    description: >
+      Daily sales velocity per product (StockCode), with 7-day rolling averages,
+      a lifetime revenue rank, and a fast-mover flag indicating top-10% units
+      sold within each trading day. One row per (sale_date, StockCode).
+    columns:
+      - name: sale_date
+        description: "Calendar date the product units were sold."
+
+      - name: StockCode
+        description: "Unique product identifier, whitespace-trimmed."
+        tests:
+          - not_null
+
+      - name: Description
+        description: "Product description; MAX() applied to resolve rare StockCode/description mismatches."
+
+      - name: units_sold
+        description: "Total units (Quantity) sold for this product on this date."
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "> 0"
+
+      - name: daily_revenue
+        description: "Sum of TotalRevenue for this product on this date."
+
+      - name: units_7day_rolling_avg
+        description: >
+          7-day trailing average of units_sold partitioned by StockCode, ordered
+          by sale_date (ROWS BETWEEN 6 PRECEDING AND CURRENT ROW).
+
+      - name: revenue_rank
+        description: >
+          DENSE_RANK of the product by its all-time cumulative revenue across the
+          entire dataset. Rank 1 = highest lifetime revenue product.
+
+      - name: is_fast_mover
+        description: >
+          TRUE when the product falls in the top 10% of units_sold for that
+          specific trading day (NTILE(10) decile = 1 within sale_date).
+
+  # ---------------------------------------------------------------------------
+  - name: gold_customer_metrics
+    description: >
+      Lifetime behavioural metrics per identified customer. Guest transactions
+      (CustomerID = 'GUEST') are excluded. One row per CustomerID.
+    columns:
+      - name: CustomerID
+        description: "Unique customer identifier inherited from the silver layer."
+        tests:
+          - not_null
+
+      - name: total_spend
+        description: "Lifetime sum of TotalRevenue across all orders for this customer."
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "> 0"
+
+      - name: total_orders
+        description: "Count of distinct InvoiceNo values placed by this customer."
+
+      - name: avg_order_value
+        description: "total_spend divided by total_orders; null-safe against zero orders."
+
+      - name: first_purchase_date
+        description: "Timestamp of the customer's earliest invoice."
+
+      - name: last_purchase_date
+        description: "Timestamp of the customer's most recent invoice."
+
+      - name: days_since_last_purchase
+        description: "Integer days between last_purchase_date and the current date at query time."
+
+      - name: orders_per_month
+        description: >
+          total_orders divided by the number of calendar months between
+          first_purchase_date and last_purchase_date. A minimum of 1 month is
+          applied to avoid division by zero for single-month customers.
+
+      - name: customer_segment
+        description: >
+          Behavioural tier derived from total_spend:
+          'VIP' (> £1,000), 'REGULAR' (£250–£1,000), 'OCCASIONAL' (< £250).
+        tests:
+          - accepted_values:
+              values: ['VIP', 'REGULAR', 'OCCASIONAL']
+
+  # ---------------------------------------------------------------------------
+  - name: gold_anomaly_features
+    description: >
+      Date-level feature table for anomaly detection and AI analysis. Aggregates
+      gold_daily_revenue across all countries into a single daily row, recomputes
+      z-scores at that granularity, surfaces the top product per day from
+      gold_product_velocity, and classifies each day's anomaly type.
+      One row per sale_date.
+    columns:
+      - name: sale_date
+        description: "Calendar date. Primary grain of this model — one row per day."
+        tests:
+          - not_null
+
+      - name: total_revenue
+        description: "Sum of total_revenue across all countries for this date."
+
+      - name: total_orders
+        description: "Sum of total_orders across all countries for this date."
+
+      - name: unique_customers
+        description: >
+          Sum of unique_customers across all countries. Note: a customer buying
+          in multiple countries on the same day is counted once per country.
+
+      - name: revenue_zscore
+        description: >
+          Standard-score of total_revenue computed globally at date level
+          (after summing across countries). Used to drive anomaly classification.
+
+      - name: revenue_dod_change_pct
+        description: "Day-over-day percentage change in date-level total_revenue. NULL on the first date."
+
+      - name: revenue_7day_rolling_avg
+        description: "7-day trailing average of date-level total_revenue (ROWS BETWEEN 6 PRECEDING AND CURRENT ROW)."
+
+      - name: is_anomaly_day
+        description: "TRUE when ABS(revenue_zscore) > 2.5 at the date-aggregated level."
+
+      - name: top_product_that_day
+        description: "StockCode of the product with the highest units_sold on this date, from gold_product_velocity."
+
+      - name: is_weekend
+        description: "TRUE when sale_date falls on Saturday or Sunday (Snowflake DAYOFWEEK 0=Sun, 6=Sat)."
+
+      - name: anomaly_type
+        description: >
+          Classification of the day's revenue behaviour:
+          'revenue_spike' (zscore > 2.5), 'revenue_drop' (zscore < -2.5), 'normal' otherwise.
+        tests:
+          - accepted_values:
+              values: ['revenue_spike', 'revenue_drop', 'normal']
