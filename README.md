@@ -9,10 +9,14 @@
 ---
 
 ## 🌐 Live Demo
+
+> ⚠️ **Note:** The Snowflake free trial backing this project's data warehouse has expired, so the live app/API links below may not return live data right now. A full walkthrough recording is available below so you can see the pipeline and AI agent working end-to-end.
+
 🔗 **App:** https://data-sense-eight.vercel.app
 📡 **API:** https://datasense-api-n1s3.onrender.com/docs
 
-> Note: Backend runs on Render free tier — first load may take 30-60 seconds to wake up.
+### 🎥 Demo Recording
+[📹 Watch the full pipeline running](./demo/Datasense%20project%20video.mp4)
 
 ---
 
@@ -130,7 +134,7 @@ Groq's Llama 3.3 70B receives anomaly data + RAG context + Tavily results and ge
 ### Prerequisites
 - Python 3.10+
 - Node.js 18+
-- Snowflake account (free trial at snowflake.com)
+- Snowflake account (free trial at snowflake.com) — *note: Snowflake trials are 30 days / $400 credits; you'll need your own trial or paid account to run this yourself*
 - Groq API key (free at console.groq.com)
 - Tavily API key (free at app.tavily.com)
 
